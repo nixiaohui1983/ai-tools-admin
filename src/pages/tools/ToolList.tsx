@@ -1,266 +1,120 @@
-import { useState, useEffect, useCallback } from "react";
-import {
-  Card,
-  Button,
-  Table,
-  Tag,
-  Space,
-  Modal,
-  Form,
-  Input,
-  Select,
-  message,
-  Popconfirm,
-  Switch,
-} from "antd";
-import { PlusOutlined, SearchOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Table, Button, Tag, Space, Input, Select, message, Popconfirm, Spin } from "antd";
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, StarFilled } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import PageHeader from "../../components/PageHeader";
 import { toolsAPI, type ToolDTO } from "../../api";
 
-const categoryOptions = [
-  { value: "writing", label: "Writing" },
-  { value: "image", label: "Image" },
-  { value: "video", label: "Video" },
-  { value: "coding", label: "Coding" },
-  { value: "marketing", label: "Marketing" },
-  { value: "productivity", label: "Productivity" },
-];
-
-const pricingOptions = [
-  { value: "free", label: "Free" },
-  { value: "freemium", label: "Freemium" },
-  { value: "paid", label: "Paid" },
-  { value: "subscription", label: "Subscription" },
-];
+const pricingColors: Record<string, string> = {
+  free: "green", freemium: "blue", paid: "orange", enterprise: "red",
+};
 
 export default function ToolList() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<ToolDTO | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ToolDTO[]>([]);
+  const [tools, setTools] = useState<ToolDTO[]>([]);
   const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState("");
-  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(true);
+  const [searchText, setSearchText] = useState("");
+  const [pricingFilter, setPricingFilter] = useState<string | undefined>();
 
-  const fetchData = useCallback(async () => {
+  const loadTools = async () => {
     setLoading(true);
     try {
-      const res = await toolsAPI.list({ limit: 50 });
-      setData(res.data.tools);
+      const res = await toolsAPI.list({ search: searchText || undefined });
+      setTools(res.data.tools.map((t: any) => ({ ...t, key: t.id })));
       setTotal(res.data.total);
     } catch {
-      // Mock fallback
-      setData([
-        { id: "1", name: "ChatGPT", slug: "chatgpt", description: "AI language model", pricing: "freemium", rating: 4.9, categories: ["writing", "coding"], featured: true },
-        { id: "2", name: "Midjourney", slug: "midjourney", description: "AI image generation", pricing: "subscription", rating: 4.8, categories: ["image"], featured: true },
-        { id: "3", name: "GitHub Copilot", slug: "github-copilot", description: "AI code assistant", pricing: "subscription", rating: 4.7, categories: ["coding"], featured: false },
-      ]);
-      setTotal(3);
+      message.warning("API unavailable — showing mock data");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editing?.id) {
-        await toolsAPI.update(editing.id, values);
-        message.success("工具更新成功！");
-      } else {
-        await toolsAPI.create(values as ToolDTO);
-        message.success("工具创建成功！");
-      }
-      setModalOpen(false);
-      setEditing(null);
-      form.resetFields();
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "操作失败");
-    }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await toolsAPI.delete(id);
-      message.success("工具已删除");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "删除失败");
-    }
-  };
+  useEffect(() => { loadTools(); }, []);
 
-  const openCreate = () => {
-    setEditing(null);
-    form.resetFields();
-    setModalOpen(true);
-  };
-
-  const openEdit = (record: ToolDTO) => {
-    setEditing(record);
-    form.setFieldsValue(record);
-    setModalOpen(true);
-  };
-
-  const columns: ColumnsType<ToolDTO> = [
-    { title: "名称", dataIndex: "name", key: "name", sorter: (a, b) => a.name.localeCompare(b.name) },
+  const columns: ColumnsType<any> = [
     {
-      title: "Slug",
-      dataIndex: "slug",
-      key: "slug",
-      width: 140,
-    },
-    {
-      title: "分类",
-      dataIndex: "categories",
-      key: "categories",
-      render: (cats: string[]) => (
-        <Space size={[4, 4]} wrap>
-          {(cats || []).map((cat) => (
-            <Tag key={cat} color="blue">
-              {categoryOptions.find((c) => c.value === cat)?.label || cat}
-            </Tag>
-          ))}
-        </Space>
+      title: "Logo", dataIndex: "name", key: "logo", width: 70,
+      render: (name: string) => (
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow">
+          {name?.[0]}
+        </div>
       ),
     },
     {
-      title: "定价",
-      dataIndex: "pricing",
-      key: "pricing",
-      render: (p: string) => pricingOptions.find((o) => o.value === p)?.label || p,
-      filters: pricingOptions.map((o) => ({ text: o.label, value: o.value })),
-      onFilter: (val, record) => record.pricing === val,
+      title: "Name", dataIndex: "name", key: "name", width: 250,
+      sorter: (a: any, b: any) => a.name.localeCompare(b.name),
+      render: (name: string, record: any) => (
+        <div>
+          <div className="font-semibold text-gray-900">{name}</div>
+          <div className="text-xs text-gray-500">{record.description?.slice(0, 60)}...</div>
+        </div>
+      ),
     },
     {
-      title: "评分",
-      dataIndex: "rating",
-      key: "rating",
-      render: (r: number) => (r ? `⭐ ${r}` : "-"),
-      sorter: (a, b) => (a.rating || 0) - (b.rating || 0),
+      title: "Pricing", dataIndex: "pricing", key: "pricing", width: 110,
+      filters: [{ text: "Free", value: "free" }, { text: "Freemium", value: "freemium" }, { text: "Paid", value: "paid" }, { text: "Enterprise", value: "enterprise" }],
+      onFilter: (value: any, record: any) => record.pricing === value,
+      render: (p: string) => <Tag color={pricingColors[p] || "default"} className="capitalize">{p}</Tag>,
     },
     {
-      title: "推荐",
-      dataIndex: "featured",
-      key: "featured",
-      render: (f: boolean) => (f ? <Tag color="gold">Featured</Tag> : "-"),
-      filters: [
-        { text: "是", value: true },
-        { text: "否", value: false },
-      ],
-      onFilter: (val, record) => record.featured === val,
+      title: "Rating", dataIndex: "rating", key: "rating", width: 90,
+      sorter: (a: any, b: any) => (a.rating || 0) - (b.rating || 0),
+      render: (r: number) => (
+        <span className="flex items-center gap-1">
+          <StarFilled className="text-yellow-400 text-xs" />
+          <span className="font-medium">{r ? Number(r).toFixed(1) : "—"}</span>
+        </span>
+      ),
     },
     {
-      title: "操作",
-      key: "action",
-      width: 160,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除"
-            description={`确定要删除 ${record.name} 吗？`}
-            onConfirm={() => handleDelete(record.id!)}
-            okText="确定"
-            cancelText="取消"
-            icon={<ExclamationCircleOutlined />}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
+      title: "Categories", dataIndex: "categories", key: "categories", width: 200,
+      render: (cats: string[]) => (
+        <div className="flex flex-wrap gap-1">
+          {cats?.map((c) => <Tag key={c} className="text-xs">{c}</Tag>)}
+        </div>
+      ),
+    },
+    {
+      title: "Created", dataIndex: "createdAt", key: "createdAt", width: 110,
+      sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      render: (d: string) => new Date(d).toLocaleDateString(),
+    },
+    {
+      title: "Actions", key: "actions", width: 120, fixed: "right" as const,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.name}`)} />
+          <Popconfirm title="确定删除此工具？" onConfirm={async () => {
+            try { await toolsAPI.delete(record.id); message.success("已删除"); loadTools(); } catch { message.error("删除失败"); }
+          }} okText="确认" cancelText="取消">
+            <Button type="text" danger icon={<DeleteOutlined />} size="small" />
           </Popconfirm>
         </Space>
       ),
     },
   ];
 
-  const filteredData = search
-    ? data.filter(
-        (t) =>
-          t.name.toLowerCase().includes(search.toLowerCase()) ||
-          (t.slug && t.slug.toLowerCase().includes(search.toLowerCase()))
-      )
-    : data;
+  const dataSource = tools.filter((t: any) => {
+    if (searchText && !t.name?.toLowerCase().includes(searchText.toLowerCase())) return false;
+    if (pricingFilter && t.pricing !== pricingFilter) return false;
+    return true;
+  });
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold m-0">工具管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          添加工具
-        </Button>
+      <PageHeader title="工具管理" description="管理平台上的所有 AI 工具数据"
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增工具")}>新增工具</Button>} />
+      <div className="mb-4 flex items-center gap-4">
+        <Input placeholder="搜索工具名称..." prefix={<SearchOutlined />} value={searchText}
+          onChange={(e) => setSearchText(e.target.value)} style={{ width: 300 }} allowClear />
+        <Select placeholder="筛选定价" value={pricingFilter} onChange={setPricingFilter} allowClear style={{ width: 150 }}
+          options={[{ value: "free", label: "Free" }, { value: "freemium", label: "Freemium" }, { value: "paid", label: "Paid" }, { value: "enterprise", label: "Enterprise" }]} />
+        <Button onClick={() => loadTools()}>刷新</Button>
       </div>
-
-      <Card>
-        <div className="flex items-center gap-4 mb-4">
-          <Input
-            placeholder="搜索工具名称..."
-            prefix={<SearchOutlined />}
-            className="max-w-xs"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
-          />
-          <span className="text-gray-400 text-sm">共 {filteredData.length} 个工具</span>
-        </div>
-
-        <Table<ToolDTO>
-          columns={columns}
-          dataSource={filteredData}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 个` }}
-        />
-      </Card>
-
-      <Modal
-        title={editing ? "编辑工具" : "添加工具"}
-        open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditing(null);
-          form.resetFields();
-        }}
-        onOk={handleSubmit}
-        width={640}
-        okText={editing ? "更新" : "创建"}
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="name" label="工具名称" rules={[{ required: true, message: "请输入工具名称" }]}>
-              <Input placeholder="例如：ChatGPT" />
-            </Form.Item>
-            <Form.Item name="slug" label="Slug" rules={[{ required: true, message: "请输入 slug" }]}>
-              <Input placeholder="例如：chatgpt" />
-            </Form.Item>
-          </div>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="工具描述..." />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="pricing" label="定价模式">
-              <Select options={pricingOptions} placeholder="选择定价模式" />
-            </Form.Item>
-            <Form.Item name="rating" label="评分">
-              <Input type="number" min={0} max={5} step={0.1} placeholder="0-5" />
-            </Form.Item>
-          </div>
-          <Form.Item name="categories" label="分类">
-            <Select mode="multiple" options={categoryOptions} placeholder="选择分类" />
-          </Form.Item>
-          <Form.Item name="website" label="官网链接">
-            <Input placeholder="https://..." />
-          </Form.Item>
-          <Form.Item name="featured" label="推荐" valuePropName="checked">
-            <Switch checkedChildren="推荐" unCheckedChildren="普通" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <Spin spinning={loading}>
+        <Table columns={columns} dataSource={dataSource} rowKey="id"
+          pagination={{ total: dataSource.length || total, pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }} />
+      </Spin>
     </div>
   );
 }

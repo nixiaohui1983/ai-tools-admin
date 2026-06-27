@@ -4,12 +4,11 @@ import { ConfigProvider, Layout, Menu, theme } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import {
   ToolOutlined,
-  TaskOutlined,
-  FlowOutlined,
+  SolutionOutlined,
+  NodeIndexOutlined,
   FileTextOutlined,
   UserOutlined,
   DashboardOutlined,
-  SettingOutlined,
 } from "@ant-design/icons";
 import Dashboard from "./pages/dashboard";
 import ToolList from "./pages/tools/ToolList";
@@ -36,12 +35,12 @@ function App() {
     },
     {
       key: "/tasks",
-      icon: <TaskOutlined />,
+      icon: <SolutionOutlined />,
       label: "任务管理",
     },
     {
       key: "/workflows",
-      icon: <FlowOutlined />,
+      icon: <NodeIndexOutlined />,
       label: "工作流管理",
     },
     {

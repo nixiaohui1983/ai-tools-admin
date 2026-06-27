@@ -1,131 +1,71 @@
-import { useState, useEffect, useCallback } from "react";
-import { Card, Button, Table, Tag, Badge, Space, Modal, Form, Input, Select, Switch, message, Popconfirm } from "antd";
-import { PlusOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import PageHeader from "../../components/PageHeader";
 import { articlesAPI, type ArticleDTO } from "../../api";
 
-const categoryOptions = [
-  { value: "decision", label: "Decision Guide" },
-  { value: "workflow", label: "Workflow Tutorial" },
-  { value: "comparison", label: "Tool Comparison" },
-  { value: "tutorial", label: "Tutorial" },
-];
+const categoryLabels: Record<string, string> = {
+  comparison: "对比评测", guide: "使用指南", workflow: "工作流", review: "工具评测",
+};
 
 export default function ArticleList() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<ArticleDTO | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ArticleDTO[]>([]);
-  const [form] = Form.useForm();
+  const [articles, setArticles] = useState<ArticleDTO[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const loadArticles = async () => {
     setLoading(true);
     try {
       const res = await articlesAPI.list();
-      setData(res.data || []);
+      setArticles(res.data.map((a: any) => ({ ...a, key: a.id })));
+      setTotal(res.total);
     } catch {
-      setData([
-        { id: "1", title: "ChatGPT vs Claude vs Gemini: Which is Best in 2026?", slug: "chatgpt-vs-claude-vs-gemini", category: "comparison", published: true, featured: true },
-        { id: "2", title: "Build a Content Marketing Stack", slug: "content-marketing-stack", category: "workflow", published: true, featured: true },
-        { id: "3", title: "Best Free AI Tools for Startups", slug: "free-ai-tools-startups", category: "decision", published: false, featured: false },
-      ]);
+      message.warning("API unavailable");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editing?.id) {
-        await articlesAPI.update(editing.id, values);
-        message.success("文章更新成功！");
-      } else {
-        await articlesAPI.create(values as ArticleDTO);
-        message.success("文章创建成功！");
-      }
-      setModalOpen(false);
-      setEditing(null);
-      form.resetFields();
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "操作失败");
-    }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await articlesAPI.delete(id);
-      message.success("文章已删除");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "删除失败");
-    }
-  };
+  useEffect(() => { loadArticles(); }, []);
 
-  const handlePublish = async (id: string) => {
-    try {
-      await articlesAPI.publish(id);
-      message.success("文章已发布！");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "发布失败");
-    }
-  };
-
-  const columns: ColumnsType<ArticleDTO> = [
-    { title: "文章标题", dataIndex: "title", key: "title", ellipsis: true },
+  const columns: ColumnsType<any> = [
     {
-      title: "分类",
-      dataIndex: "category",
-      key: "category",
-      render: (cat: string) => (
-        <Tag color="purple">
-          {categoryOptions.find((c) => c.value === cat)?.label || cat}
-        </Tag>
+      title: "Title", dataIndex: "title", key: "title", width: 300,
+      render: (t: string, r: any) => (
+        <div><div className="font-semibold">{t}</div><div className="text-xs text-gray-500">{r.excerpt?.slice(0, 80)}</div></div>
       ),
     },
+    { title: "Slug", dataIndex: "slug", key: "slug", width: 180, ellipsis: true },
     {
-      title: "状态",
-      dataIndex: "published",
-      key: "published",
-      render: (p: boolean) => (
-        <Badge status={p ? "success" : "default"} text={p ? "已发布" : "草稿"} />
-      ),
+      title: "Category", dataIndex: "category", key: "category", width: 100,
+      render: (c: string) => <Tag color="blue">{categoryLabels[c] || c}</Tag>,
     },
     {
-      title: "推荐",
-      dataIndex: "featured",
-      key: "featured",
-      render: (f: boolean) => (f ? <Tag color="gold">Featured</Tag> : "-"),
+      title: "Status", dataIndex: "published", key: "published", width: 80,
+      filters: [{ text: "Published", value: true }, { text: "Draft", value: false }],
+      onFilter: (v: any, r: any) => r.published === v,
+      render: (p: boolean) => <Tag color={p ? "green" : "default"}>{p ? "已发布" : "草稿"}</Tag>,
     },
     {
-      title: "操作",
-      key: "action",
-      width: 220,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => { setEditing(record); form.setFieldsValue(record); setModalOpen(true); }}>
-            编辑
-          </Button>
-          {!record.published && (
-            <Button type="link" size="small" onClick={() => handlePublish(record.id!)}>
-              发布
-            </Button>
-          )}
-          <Popconfirm
-            title="确认删除"
-            description={`确定要删除 "${record.title}" 吗？`}
-            onConfirm={() => handleDelete(record.id!)}
-            okText="确定"
-            cancelText="取消"
-            icon={<ExclamationCircleOutlined />}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
+      title: "Featured", dataIndex: "featured", key: "featured", width: 70,
+      render: (f: boolean) => f ? "⭐" : "—",
+    },
+    { title: "Views", dataIndex: "viewCount", key: "viewCount", width: 70 },
+    {
+      title: "Date", dataIndex: "publishedAt", key: "publishedAt", width: 110,
+      render: (d: string) => d ? new Date(d).toLocaleDateString() : "—",
+    },
+    {
+      title: "Actions", key: "actions", width: 140, fixed: "right" as const,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.title}`)} />
+          <Button type="text" icon={<EyeOutlined />} size="small" onClick={() => message.info(`Preview ${record.title}`)} />
+          <Popconfirm title="确定删除？" onConfirm={async () => {
+            try { await articlesAPI.delete(record.id); message.success("已删除"); loadArticles(); } catch { message.error("删除失败"); }
+          }}>
+            <Button type="text" danger icon={<DeleteOutlined />} size="small" />
           </Popconfirm>
         </Space>
       ),
@@ -134,60 +74,12 @@ export default function ArticleList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold m-0">内容管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>
-          写文章
-        </Button>
-      </div>
-
-      <Card>
-        <Table<ArticleDTO>
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 篇` }}
-        />
-      </Card>
-
-      <Modal
-        title={editing ? "编辑文章" : "写文章"}
-        open={modalOpen}
-        onCancel={() => { setModalOpen(false); setEditing(null); form.resetFields(); }}
-        onOk={handleSubmit}
-        width={720}
-        okText={editing ? "更新" : "创建"}
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="title" label="文章标题" rules={[{ required: true, message: "请输入文章标题" }]}>
-            <Input placeholder="例如：ChatGPT vs Claude Comparison" />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="slug" label="Slug" rules={[{ required: true, message: "请输入 slug" }]}>
-              <Input placeholder="例如：chatgpt-vs-claude" />
-            </Form.Item>
-            <Form.Item name="category" label="分类">
-              <Select options={categoryOptions} placeholder="选择分类" />
-            </Form.Item>
-          </div>
-          <Form.Item name="excerpt" label="摘要">
-            <Input.TextArea rows={2} placeholder="文章摘要..." />
-          </Form.Item>
-          <Form.Item name="content" label="正文内容">
-            <Input.TextArea rows={8} placeholder="支持 Markdown 格式..." />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="published" label="立即发布" valuePropName="checked">
-              <Switch checkedChildren="发布" unCheckedChildren="草稿" />
-            </Form.Item>
-            <Form.Item name="featured" label="推荐文章" valuePropName="checked">
-              <Switch checkedChildren="推荐" unCheckedChildren="普通" />
-            </Form.Item>
-          </div>
-        </Form>
-      </Modal>
+      <PageHeader title="内容管理" description="管理 SEO 内容文章"
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增文章")}>新增文章</Button>} />
+      <Spin spinning={loading}>
+        <Table columns={columns} dataSource={articles} rowKey="id"
+          pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
+      </Spin>
     </div>
   );
 }

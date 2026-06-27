@@ -1,132 +1,56 @@
-import { useState, useEffect, useCallback } from "react";
-import { Card, Button, Table, Tag, Space, Modal, Form, Input, Select, message, Popconfirm } from "antd";
-import { PlusOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import PageHeader from "../../components/PageHeader";
 import { tasksAPI, type TaskDTO } from "../../api";
 
-const categoryOptions = [
-  { value: "content", label: "Content" },
-  { value: "business", label: "Business" },
-  { value: "design", label: "Design" },
-  { value: "automation", label: "Automation" },
-  { value: "coding", label: "Coding" },
-];
-
-const difficultyOptions = [
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
-];
-
-const difficultyColor: Record<string, string> = {
-  easy: "green",
-  medium: "orange",
-  hard: "red",
-};
+const difficultyColors: Record<string, string> = { easy: "green", medium: "orange", hard: "red" };
 
 export default function TaskList() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<TaskDTO | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<TaskDTO[]>([]);
-  const [form] = Form.useForm();
+  const [tasks, setTasks] = useState<TaskDTO[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const loadTasks = async () => {
     setLoading(true);
     try {
       const res = await tasksAPI.list();
-      setData(res.data || []);
+      setTasks(res.data.map((t: any) => ({ ...t, key: t.id })));
+      setTotal(res.total);
     } catch {
-      setData([
-        { id: "1", title: "Write SEO Blog Post", description: "Create optimized blog content", difficulty: "medium", category: "content", toolCount: 3, output: "Published blog post", featured: true },
-        { id: "2", title: "Make YouTube Video", description: "Automate video creation", difficulty: "hard", category: "content", toolCount: 4, output: "Published video", featured: true },
-        { id: "3", title: "Automate Email Marketing", description: "Set up automated email sequences", difficulty: "easy", category: "business", toolCount: 2, output: "Email campaign", featured: false },
-      ]);
+      message.warning("API unavailable");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editing?.id) {
-        await tasksAPI.update(editing.id, values);
-        message.success("任务更新成功！");
-      } else {
-        await tasksAPI.create(values as TaskDTO);
-        message.success("任务创建成功！");
-      }
-      setModalOpen(false);
-      setEditing(null);
-      form.resetFields();
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "操作失败");
-    }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await tasksAPI.delete(id);
-      message.success("任务已删除");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "删除失败");
-    }
-  };
+  useEffect(() => { loadTasks(); }, []);
 
-  const columns: ColumnsType<TaskDTO> = [
-    { title: "任务名称", dataIndex: "title", key: "title" },
+  const columns: ColumnsType<any> = [
+    { title: "Icon", dataIndex: "icon", key: "icon", width: 60, render: (icon: string) => <span className="text-2xl">{icon || "📋"}</span> },
     {
-      title: "分类",
-      dataIndex: "category",
-      key: "category",
-      render: (cat: string) => (
-        <Tag color="blue">
-          {categoryOptions.find((c) => c.value === cat)?.label || cat}
-        </Tag>
+      title: "Title", dataIndex: "title", key: "title",
+      render: (t: string, r: any) => (
+        <div><div className="font-semibold">{t}</div><div className="text-xs text-gray-500">{r.description?.slice(0, 80)}</div></div>
       ),
     },
     {
-      title: "难度",
-      dataIndex: "difficulty",
-      key: "difficulty",
-      render: (d: string) => (
-        <Tag color={difficultyColor[d] || "default"}>
-          {difficultyOptions.find((o) => o.value === d)?.label || d}
-        </Tag>
-      ),
+      title: "Difficulty", dataIndex: "difficulty", key: "difficulty", width: 100,
+      render: (d: string) => <Tag color={difficultyColors[d] || "default"} className="capitalize">{d}</Tag>,
     },
-    { title: "工具数量", dataIndex: "toolCount", key: "toolCount", sorter: (a, b) => (a.toolCount || 0) - (b.toolCount || 0) },
+    { title: "Category", dataIndex: "category", key: "category", width: 110, render: (c: string) => <Tag className="capitalize">{c}</Tag> },
+    { title: "Tools", dataIndex: "toolCount", key: "toolCount", width: 70 },
+    { title: "Output", dataIndex: "output", key: "output", width: 200, ellipsis: true },
     {
-      title: "推荐",
-      dataIndex: "featured",
-      key: "featured",
-      render: (f: boolean) => (f ? <Tag color="gold">Featured</Tag> : "-"),
-    },
-    {
-      title: "操作",
-      key: "action",
-      width: 160,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => { setEditing(record); form.setFieldsValue(record); setModalOpen(true); }}>
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除"
-            description={`确定要删除 ${record.title} 吗？`}
-            onConfirm={() => handleDelete(record.id!)}
-            okText="确定"
-            cancelText="取消"
-            icon={<ExclamationCircleOutlined />}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
+      title: "Actions", key: "actions", width: 120, fixed: "right" as const,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.title}`)} />
+          <Popconfirm title="确定删除此任务？" onConfirm={async () => {
+            try { await tasksAPI.delete(record.id); message.success("已删除"); loadTasks(); } catch { message.error("删除失败"); }
+          }}>
+            <Button type="text" danger icon={<DeleteOutlined />} size="small" />
           </Popconfirm>
         </Space>
       ),
@@ -135,60 +59,12 @@ export default function TaskList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold m-0">任务管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>
-          添加任务
-        </Button>
-      </div>
-
-      <Card>
-        <Table<TaskDTO>
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 个` }}
-        />
-      </Card>
-
-      <Modal
-        title={editing ? "编辑任务" : "添加任务"}
-        open={modalOpen}
-        onCancel={() => { setModalOpen(false); setEditing(null); form.resetFields(); }}
-        onOk={handleSubmit}
-        width={640}
-        okText={editing ? "更新" : "创建"}
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="title" label="任务名称" rules={[{ required: true, message: "请输入任务名称" }]}>
-            <Input placeholder="例如：Write SEO Blog Post" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="任务描述..." />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="category" label="分类">
-              <Select options={categoryOptions} placeholder="选择分类" />
-            </Form.Item>
-            <Form.Item name="difficulty" label="难度">
-              <Select options={difficultyOptions} placeholder="选择难度" />
-            </Form.Item>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="toolCount" label="工具数量">
-              <Input type="number" min={0} placeholder="0" />
-            </Form.Item>
-            <Form.Item name="featured" label="推荐" valuePropName="checked">
-              <Switch checkedChildren="推荐" unCheckedChildren="普通" />
-            </Form.Item>
-          </div>
-          <Form.Item name="output" label="预期输出">
-            <Input placeholder="例如：Published blog post" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <PageHeader title="任务管理" description="管理任务模板数据"
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增任务")}>新增任务</Button>} />
+      <Spin spinning={loading}>
+        <Table columns={columns} dataSource={tasks} rowKey="id"
+          pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
+      </Spin>
     </div>
   );
 }

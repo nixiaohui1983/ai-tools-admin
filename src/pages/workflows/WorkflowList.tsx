@@ -1,121 +1,77 @@
-import { useState, useEffect, useCallback } from "react";
-import { Card, Button, Table, Tag, Space, Modal, Form, Input, Switch, message, Popconfirm } from "antd";
-import { PlusOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import PageHeader from "../../components/PageHeader";
 import { workflowsAPI, type WorkflowDTO } from "../../api";
 
 export default function WorkflowList() {
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<WorkflowDTO | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<WorkflowDTO[]>([]);
-  const [form] = Form.useForm();
+  const [workflows, setWorkflows] = useState<WorkflowDTO[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  const loadWorkflows = async () => {
     setLoading(true);
     try {
       const res = await workflowsAPI.list();
-      setData(res.data || []);
+      setWorkflows(res.data.map((w: any) => ({ ...w, key: w.id })));
+      setTotal(res.total);
     } catch {
-      setData([
-        { id: "1", name: "Write SEO Blog in 30 min", description: "Complete blog writing workflow", isTemplate: true, featured: true },
-        { id: "2", name: "YouTube Automation System", description: "Automated video creation", isTemplate: true, featured: true },
-        { id: "3", name: "AI eCommerce Product Generator", description: "Product listing automation", isTemplate: false, featured: false },
-      ]);
+      message.warning("API unavailable");
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleSubmit = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editing?.id) {
-        await workflowsAPI.update(editing.id, values);
-        message.success("工作流更新成功！");
-      } else {
-        await workflowsAPI.create(values as WorkflowDTO);
-        message.success("工作流创建成功！");
-      }
-      setModalOpen(false);
-      setEditing(null);
-      form.resetFields();
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "操作失败");
-    }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await workflowsAPI.delete(id);
-      message.success("工作流已删除");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "删除失败");
-    }
-  };
+  useEffect(() => { loadWorkflows(); }, []);
 
-  const handlePublish = async (id: string) => {
-    try {
-      await workflowsAPI.publish(id);
-      message.success("工作流已发布！");
-      fetchData();
-    } catch (err: any) {
-      message.error(err.message || "发布失败");
-    }
-  };
-
-  const columns: ColumnsType<WorkflowDTO> = [
-    { title: "工作流名称", dataIndex: "name", key: "name" },
+  const columns: ColumnsType<any> = [
     {
-      title: "描述",
-      dataIndex: "description",
-      key: "description",
-      ellipsis: true,
-      width: 240,
+      title: "Name", dataIndex: "name", key: "name", width: 200,
+      render: (n: string, r: any) => (
+        <div><div className="font-semibold">{n}</div><div className="text-xs text-gray-500">{r.description?.slice(0, 60)}</div></div>
+      ),
+    },
+    { title: "Slug", dataIndex: "slug", key: "slug", width: 150, ellipsis: true },
+    {
+      title: "Template", dataIndex: "isTemplate", key: "isTemplate", width: 80,
+      render: (v: boolean) => <Tag color={v ? "blue" : "default"}>{v ? "模板" : "自定义"}</Tag>,
     },
     {
-      title: "模板",
-      dataIndex: "isTemplate",
-      key: "isTemplate",
-      render: (val: boolean) => (
-        <Tag color={val ? "green" : "default"}>
-          {val ? "是" : "否"}
-        </Tag>
+      title: "Featured", dataIndex: "featured", key: "featured", width: 70,
+      render: (f: boolean) => f ? "⭐" : "—",
+    },
+    {
+      title: "Steps", key: "steps", width: 200,
+      render: (_: any, r: any) => {
+        const tools = r.tools || [];
+        return (
+          <div className="flex items-center gap-1">
+            {tools.slice(0, 4).map((wt: any, i: number) => (
+              <span key={i} className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{wt.tool?.name || wt.toolId}</span>
+            ))}
+            {tools.length > 4 && <span className="text-xs text-gray-400">+{tools.length - 4}</span>}
+          </div>
+        );
+      },
+    },
+    {
+      title: "Est. Cost / Time", key: "cost", width: 130,
+      render: (_: any, r: any) => (
+        <span className="text-xs text-gray-600">
+          {r.estimatedCost ? `$${Number(r.estimatedCost).toFixed(0)}` : "—"} / {r.estimatedTime ? `${r.estimatedTime}min` : "—"}
+        </span>
       ),
     },
     {
-      title: "推荐",
-      dataIndex: "featured",
-      key: "featured",
-      render: (f: boolean) => (f ? <Tag color="gold">Featured</Tag> : "-"),
-    },
-    {
-      title: "操作",
-      key: "action",
-      width: 200,
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => { setEditing(record); form.setFieldsValue(record); setModalOpen(true); }}>
-            编辑
-          </Button>
-          <Button type="link" size="small" onClick={() => handlePublish(record.id!)}>
-            发布
-          </Button>
-          <Popconfirm
-            title="确认删除"
-            description={`确定要删除 ${record.name} 吗？`}
-            onConfirm={() => handleDelete(record.id!)}
-            okText="确定"
-            cancelText="取消"
-            icon={<ExclamationCircleOutlined />}
-          >
-            <Button type="link" size="small" danger>
-              删除
-            </Button>
+      title: "Actions", key: "actions", width: 120, fixed: "right" as const,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.name}`)} />
+          <Popconfirm title="确定删除？" onConfirm={async () => {
+            try { await workflowsAPI.delete(record.id); message.success("已删除"); loadWorkflows(); } catch { message.error("删除失败"); }
+          }}>
+            <Button type="text" danger icon={<DeleteOutlined />} size="small" />
           </Popconfirm>
         </Space>
       ),
@@ -124,49 +80,12 @@ export default function WorkflowList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold m-0">工作流管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); form.resetFields(); setModalOpen(true); }}>
-          创建工作流
-        </Button>
-      </div>
-
-      <Card>
-        <Table<WorkflowDTO>
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 个` }}
-        />
-      </Card>
-
-      <Modal
-        title={editing ? "编辑工作流" : "创建工作流"}
-        open={modalOpen}
-        onCancel={() => { setModalOpen(false); setEditing(null); form.resetFields(); }}
-        onOk={handleSubmit}
-        width={640}
-        okText={editing ? "更新" : "创建"}
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="name" label="工作流名称" rules={[{ required: true, message: "请输入工作流名称" }]}>
-            <Input placeholder="例如：Write SEO Blog in 30 min" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="工作流描述..." />
-          </Form.Item>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item name="isTemplate" label="设为模板" valuePropName="checked">
-              <Switch checkedChildren="是" unCheckedChildren="否" />
-            </Form.Item>
-            <Form.Item name="featured" label="推荐" valuePropName="checked">
-              <Switch checkedChildren="推荐" unCheckedChildren="普通" />
-            </Form.Item>
-          </div>
-        </Form>
-      </Modal>
+      <PageHeader title="工作流管理" description="管理工作流模板和组合方案"
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增工作流")}>新增工作流</Button>} />
+      <Spin spinning={loading}>
+        <Table columns={columns} dataSource={workflows} rowKey="id"
+          pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
+      </Spin>
     </div>
   );
 }

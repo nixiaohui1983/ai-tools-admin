@@ -63,7 +63,10 @@ export interface TaskDTO {
 }
 
 export const tasksAPI = {
-  list: async () => fetchAPI<{ data: TaskDTO[] }>('/api/v1/tasks'),
+  list: async () => {
+    const res = await fetchAPI<{ data: { tasks: TaskDTO[]; total: number } }>('/api/v1/tasks');
+    return { data: res.data.tasks, total: res.data.total };
+  },
   create: async (data: TaskDTO) =>
     fetchAPI<{ data: TaskDTO }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: string, data: Partial<TaskDTO>) =>
@@ -84,15 +87,16 @@ export interface WorkflowDTO {
 }
 
 export const workflowsAPI = {
-  list: async () => fetchAPI<{ data: WorkflowDTO[] }>('/api/v1/workflows'),
+  list: async () => {
+    const res = await fetchAPI<{ data: { workflows: WorkflowDTO[]; total: number } }>('/api/v1/workflows');
+    return { data: res.data.workflows, total: res.data.total };
+  },
   create: async (data: WorkflowDTO) =>
     fetchAPI<{ data: WorkflowDTO }>('/api/v1/workflows', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: string, data: Partial<WorkflowDTO>) =>
     fetchAPI<{ data: WorkflowDTO }>(`/api/v1/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: async (id: string) =>
     fetchAPI<void>(`/api/v1/workflows/${id}`, { method: 'DELETE' }),
-  publish: async (id: string) =>
-    fetchAPI<{ data: WorkflowDTO }>(`/api/v1/workflows/${id}/publish`, { method: 'POST' }),
 };
 
 // Articles
@@ -108,7 +112,10 @@ export interface ArticleDTO {
 }
 
 export const articlesAPI = {
-  list: async () => fetchAPI<{ data: ArticleDTO[] }>('/api/v1/articles'),
+  list: async () => {
+    const res = await fetchAPI<{ data: { articles: ArticleDTO[]; total: number } }>('/api/v1/articles');
+    return { data: res.data.articles, total: res.data.total };
+  },
   create: async (data: ArticleDTO) =>
     fetchAPI<{ data: ArticleDTO }>('/api/v1/articles', { method: 'POST', body: JSON.stringify(data) }),
   update: async (id: string, data: Partial<ArticleDTO>) =>
