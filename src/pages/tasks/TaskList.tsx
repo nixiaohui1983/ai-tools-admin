@@ -3,6 +3,7 @@ import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import PageHeader from "../../components/PageHeader";
+import TaskFormModal from "../../components/TaskFormModal";
 import { tasksAPI, type TaskDTO } from "../../api";
 
 const difficultyColors: Record<string, string> = { easy: "green", medium: "orange", hard: "red" };
@@ -11,6 +12,8 @@ export default function TaskList() {
   const [tasks, setTasks] = useState<TaskDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskDTO | null>(null);
 
   const loadTasks = async () => {
     setLoading(true);
@@ -46,7 +49,7 @@ export default function TaskList() {
       title: "Actions", key: "actions", width: 120, fixed: "right" as const,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.title}`)} />
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => { setEditingTask(record); setModalOpen(true); }} />
           <Popconfirm title="确定删除此任务？" onConfirm={async () => {
             try { await tasksAPI.delete(record.id); message.success("已删除"); loadTasks(); } catch { message.error("删除失败"); }
           }}>
@@ -60,11 +63,12 @@ export default function TaskList() {
   return (
     <div>
       <PageHeader title="任务管理" description="管理任务模板数据"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增任务")}>新增任务</Button>} />
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingTask(null); setModalOpen(true); }}>新增任务</Button>} />
       <Spin spinning={loading}>
         <Table columns={columns} dataSource={tasks} rowKey="id"
           pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
       </Spin>
+      <TaskFormModal open={modalOpen} initialData={editingTask} onClose={() => setModalOpen(false)} onSuccess={loadTasks} />
     </div>
   );
 }

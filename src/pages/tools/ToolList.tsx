@@ -3,6 +3,7 @@ import { Table, Button, Tag, Space, Input, Select, message, Popconfirm, Spin } f
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, StarFilled } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import PageHeader from "../../components/PageHeader";
+import ToolFormModal from "../../components/ToolFormModal";
 import { toolsAPI, type ToolDTO } from "../../api";
 
 const pricingColors: Record<string, string> = {
@@ -15,6 +16,8 @@ export default function ToolList() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
   const [pricingFilter, setPricingFilter] = useState<string | undefined>();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTool, setEditingTool] = useState<ToolDTO | null>(null);
 
   const loadTools = async () => {
     setLoading(true);
@@ -83,7 +86,7 @@ export default function ToolList() {
       title: "Actions", key: "actions", width: 120, fixed: "right" as const,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.name}`)} />
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => { setEditingTool(record); setModalOpen(true); }} />
           <Popconfirm title="确定删除此工具？" onConfirm={async () => {
             try { await toolsAPI.delete(record.id); message.success("已删除"); loadTools(); } catch { message.error("删除失败"); }
           }} okText="确认" cancelText="取消">
@@ -103,7 +106,7 @@ export default function ToolList() {
   return (
     <div>
       <PageHeader title="工具管理" description="管理平台上的所有 AI 工具数据"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增工具")}>新增工具</Button>} />
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingTool(null); setModalOpen(true); }}>新增工具</Button>} />
       <div className="mb-4 flex items-center gap-4">
         <Input placeholder="搜索工具名称..." prefix={<SearchOutlined />} value={searchText}
           onChange={(e) => setSearchText(e.target.value)} style={{ width: 300 }} allowClear />
@@ -115,6 +118,7 @@ export default function ToolList() {
         <Table columns={columns} dataSource={dataSource} rowKey="id"
           pagination={{ total: dataSource.length || total, pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }} />
       </Spin>
+      <ToolFormModal open={modalOpen} initialData={editingTool} onClose={() => setModalOpen(false)} onSuccess={loadTools} />
     </div>
   );
 }

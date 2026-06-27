@@ -3,12 +3,15 @@ import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import PageHeader from "../../components/PageHeader";
+import WorkflowFormModal from "../../components/WorkflowFormModal";
 import { workflowsAPI, type WorkflowDTO } from "../../api";
 
 export default function WorkflowList() {
   const [workflows, setWorkflows] = useState<WorkflowDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<WorkflowDTO | null>(null);
 
   const loadWorkflows = async () => {
     setLoading(true);
@@ -67,7 +70,7 @@ export default function WorkflowList() {
       title: "Actions", key: "actions", width: 120, fixed: "right" as const,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.name}`)} />
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => { setEditingWorkflow(record); setModalOpen(true); }} />
           <Popconfirm title="确定删除？" onConfirm={async () => {
             try { await workflowsAPI.delete(record.id); message.success("已删除"); loadWorkflows(); } catch { message.error("删除失败"); }
           }}>
@@ -81,11 +84,12 @@ export default function WorkflowList() {
   return (
     <div>
       <PageHeader title="工作流管理" description="管理工作流模板和组合方案"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增工作流")}>新增工作流</Button>} />
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingWorkflow(null); setModalOpen(true); }}>新增工作流</Button>} />
       <Spin spinning={loading}>
         <Table columns={columns} dataSource={workflows} rowKey="id"
           pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
       </Spin>
+      <WorkflowFormModal open={modalOpen} initialData={editingWorkflow} onClose={() => setModalOpen(false)} onSuccess={loadWorkflows} />
     </div>
   );
 }

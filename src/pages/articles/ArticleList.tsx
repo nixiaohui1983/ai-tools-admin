@@ -3,6 +3,7 @@ import { Table, Button, Tag, Space, message, Popconfirm, Spin } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import PageHeader from "../../components/PageHeader";
+import ArticleFormModal from "../../components/ArticleFormModal";
 import { articlesAPI, type ArticleDTO } from "../../api";
 
 const categoryLabels: Record<string, string> = {
@@ -13,6 +14,8 @@ export default function ArticleList() {
   const [articles, setArticles] = useState<ArticleDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<ArticleDTO | null>(null);
 
   const loadArticles = async () => {
     setLoading(true);
@@ -60,7 +63,7 @@ export default function ArticleList() {
       title: "Actions", key: "actions", width: 140, fixed: "right" as const,
       render: (_: any, record: any) => (
         <Space size="small">
-          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => message.info(`Edit ${record.title}`)} />
+          <Button type="text" icon={<EditOutlined />} size="small" onClick={() => { setEditingArticle(record); setModalOpen(true); }} />
           <Button type="text" icon={<EyeOutlined />} size="small" onClick={() => message.info(`Preview ${record.title}`)} />
           <Popconfirm title="确定删除？" onConfirm={async () => {
             try { await articlesAPI.delete(record.id); message.success("已删除"); loadArticles(); } catch { message.error("删除失败"); }
@@ -75,11 +78,12 @@ export default function ArticleList() {
   return (
     <div>
       <PageHeader title="内容管理" description="管理 SEO 内容文章"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => message.info("新增文章")}>新增文章</Button>} />
+        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingArticle(null); setModalOpen(true); }}>新增文章</Button>} />
       <Spin spinning={loading}>
         <Table columns={columns} dataSource={articles} rowKey="id"
           pagination={{ total, pageSize: 10, showTotal: (t) => `共 ${t} 条` }} />
       </Spin>
+      <ArticleFormModal open={modalOpen} initialData={editingArticle} onClose={() => setModalOpen(false)} onSuccess={loadArticles} />
     </div>
   );
 }
